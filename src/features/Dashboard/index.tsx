@@ -3,21 +3,23 @@ import PhotosPlacerholder from "@/components/placeholders";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import AllGroups from "./AllGroups";
-import Train from "./Train";
-import Valid from "./Valid";
-import Test from "./Test";
+import Slider from "@/components/Slider";
+import ImageCard from "@/components/ImageCard";
+import useSearchData, { areAllNone } from "@/utils/hooks";
+import { classes } from "@/utils/constants";
 
 export default function DashboardView() {
 
-    const [albums, setAlbums] = useState([]);
     const [photos, setPhotos] = useState<any>({allGroups:[], test: [], train:[], valid:[]});
-    const [currentAlbum, setCurrentAlbum] = useState<string | null>(null);
     const [tab, setTab] = useState<number>(1);
     const [activePhotoCount, setActivePhotoCount] = useState<number>(0);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [selected, setSelected] = useState<number>(0);
     const [selectedClassFilter, setSelectedClassFilter] = useState<any[]>([]);
+    const [selectedMinRange, setSelectedMinRange] = useState<number>(0);
+    const [selectedMaxRange, setSelectedMaxRange] = useState<number>(2);
+
+
 
   useEffect(() => {
     viewAlbum("bone-fracture-detection");
@@ -41,13 +43,42 @@ export default function DashboardView() {
       .then((response) => (response.json()))
       .then((data) => {
         setPhotos(data);
-        setCurrentAlbum(albumName);
         const totalCountAll = data?.allGroups?.length
         if(totalCountAll)setActivePhotoCount(totalCountAll)
         setIsLoading(false)
       })
       .catch((error) => console.error('Error fetching photos:', error));
   };
+
+  const {handleSearchData:handleSearchDataAll, responseData: responseDataAll} = useSearchData(photos?.allGroups)
+  const {handleSearchData:handleSearchDataTrain, responseData: responseDataTrain} = useSearchData(photos?.train)
+  const {handleSearchData:handleSearchDataValid, responseData: responseDataValid} = useSearchData(photos?.valid)
+  const {handleSearchData:handleSearchDataTest, responseData: responseDataTest} = useSearchData(photos?.test)
+
+  const handleSearchAll = (searchText: string[]) => {
+    let searchBy = searchText
+    if(searchText.length > 0){
+      searchBy.push("none")
+    }
+    if(areAllNone(searchBy)){
+      searchBy=[]
+    }
+    
+    handleSearchDataAll(photos?.allGroups, searchBy);
+    handleSearchDataTrain(photos?.train, searchBy)
+    handleSearchDataValid(photos?.valid, searchBy)
+    handleSearchDataTest(photos?.test, searchBy)
+    searchBy = []
+};
+
+const handleRangeSelector = (searchRange: string[]) => {
+  console.log("searchRange-->",searchRange)
+  handleSearchDataAll(photos?.allGroups, searchRange);
+  handleSearchDataTrain(photos?.train, searchRange)
+  handleSearchDataValid(photos?.valid, searchRange)
+  handleSearchDataTest(photos?.test, searchRange)
+};
+
 
   const handleOnTabClick = (tab: number) =>{
     setTab(tab)
@@ -77,18 +108,11 @@ export default function DashboardView() {
   const handleSelected = (select:number) => {
     setSelected(select)
     if(select == 1){
-      setSelectedClassFilter(
-        [
-          "elbow_positive",
-          "fingers_positive",
-          "humerus",
-          "forearm_fracture",
-          "humerus_fracture",
-          "shoulder_fracture",
-          "wrist_positive"
-      ])
+      setSelectedClassFilter(classes)
+      handleSearchAll(classes)
     }else{
       setSelectedClassFilter([])
+      handleSearchAll([])
     }
   }
 
@@ -177,20 +201,35 @@ export default function DashboardView() {
   ]
 
   const handleSelectClassFilter = (btnName:string) =>{
-    setSelectedClassFilter([btnName])
+    if(selectedClassFilter.includes(btnName)){
+      let classArray = selectedClassFilter.filter(item => item !== btnName);
+      setSelectedClassFilter(classArray)
+      handleSearchAll(classArray)
+    }else{
+      const classesSel = [...selectedClassFilter, btnName]
+      setSelectedClassFilter(classesSel)
+      handleSearchAll(classesSel)
+    }
+    
   }
   const clearFilters = () =>{
     setSelectedClassFilter([])
     setSelected(0)
+    handleSearchAll([])
+    setSelectedMinRange(0)
+    setSelectedMaxRange(2)
   }
+
+
+
 
 
   const getTabContent = (tab : number) =>{
     const contentObj = {
-      1: <AllGroups photos={photos?.allGroups || []}/>,
-      2: <Train photos={photos?.train || []}/>,
-      3: <Valid photos={photos?.valid || []}/>,
-      4: <Test photos={photos?.test || []}/>,
+      1: <ImageCard photos={responseDataAll || []}/>,
+      2: <ImageCard photos={responseDataTrain || []}/>,
+      3: <ImageCard photos={responseDataValid || []}/>,
+      4: <ImageCard photos={responseDataTest || []}/>,
     } as any
 
     return contentObj[tab]
@@ -226,12 +265,14 @@ export default function DashboardView() {
                 </div>
                 <div>
                   <p className="font-[600] mt-5">Poligon range</p>
-                  <div className="flex justify-between mb-20 mt-3">
-                    <div>min <span className="font-[600]">0</span> </div>
-                    <div>max  <span className="font-[600]">4</span></div>
-                  </div>
-                  
-                  <div className="flex justify-between mt-5">
+                  <Slider 
+                    handleOnChangeSearch={handleRangeSelector}
+                    rangeMin={selectedMinRange} 
+                    setSelectedMinRange={setSelectedMinRange} 
+                    rangeMax={selectedMaxRange} 
+                    setSelectedMaxRange={setSelectedMaxRange}
+                  />
+                  <div className="flex justify-between mt-5 px-5">
                     <div className="font-[600] cursor-pointer" onClick={clearFilters}><i className="bi bi-trash"/>Clear filters </div>
                     <div className="text-gray-400 cursor-pointer">Need help? </div>
                   </div>
